@@ -5,6 +5,7 @@ class UsernameSniper {
     this.availableCount = 0
     this.startTime = null
     this.intervalId = null
+    this.checkedUsernames = new Set()
 
     this.initializeElements()
     this.bindEvents()
@@ -149,106 +150,67 @@ class UsernameSniper {
     return platforms.filter((platform) => document.getElementById(platform).checked)
   }
 
+  async checkRobloxOnly(username) {
+    try {
+      const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          usernames: [username],
+          excludeBannedUsers: true,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return !data.data || data.data.length === 0
+      }
+      return false
+    } catch (error) {
+      return false
+    }
+  }
+
+  generateSmartUsername(length) {
+    const prefixes = ["pro", "epic", "cool", "fire", "dark", "ice", "neo", "max", "ace", "zen"]
+    const suffixes = ["gamer", "pro", "x", "yt", "tv", "god", "king", "lord", "boss", "elite"]
+    const numbers = ["1", "2", "3", "7", "9", "69", "420", "777", "999"]
+
+    const patterns = [
+      () => {
+        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
+        const num = numbers[Math.floor(Math.random() * numbers.length)]
+        return prefix + num
+      },
+      () => {
+        const word = prefixes[Math.floor(Math.random() * prefixes.length)]
+        const suffix = suffixes[Math.floor(Math.random() * suffixes.length)]
+        return word + suffix
+      },
+      () => {
+        const chars = "abcdefghijklmnopqrstuvwxyz"
+        let result = chars[Math.floor(Math.random() * chars.length)]
+        for (let i = 1; i < length; i++) {
+          result += "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]
+        }
+        return result
+      },
+    ]
+
+    return patterns[Math.floor(Math.random() * patterns.length)]()
+  }
+
   async checkUsernameAvailability(username, platforms) {
     const results = {}
 
     for (const platform of platforms) {
-      let isAvailable = false
-
-      try {
-        switch (platform) {
-          case "roblox":
-            const robloxResponse = await fetch(`https://corsproxy.io/?https://users.roblox.com/v1/usernames/users`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                usernames: [username],
-                excludeBannedUsers: true,
-              }),
-            })
-
-            if (robloxResponse.ok) {
-              const robloxData = await robloxResponse.json()
-              isAvailable = !robloxData.data || robloxData.data.length === 0
-            } else {
-              const fallbackResponse = await fetch(
-                `https://corsproxy.io/?https://api.roblox.com/users/get-by-username?username=${username}`,
-              )
-              if (fallbackResponse.ok) {
-                const fallbackData = await fallbackResponse.json()
-                isAvailable = fallbackData.errorMessage === "User not found"
-              } else {
-                isAvailable = fallbackResponse.status === 404
-              }
-            }
-            break
-
-          case "instagram":
-            const igResponse = await fetch(
-              `https://corsproxy.io/?https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
-              {
-                headers: {
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-              },
-            )
-
-            if (igResponse.status === 404) {
-              isAvailable = true
-            } else if (igResponse.ok) {
-              const igData = await igResponse.json()
-              isAvailable = !igData.data || !igData.data.user
-            }
-            break
-
-          case "tiktok":
-            const ttResponse = await fetch(
-              `https://corsproxy.io/?https://www.tiktok.com/api/user/detail/?uniqueId=${username}`,
-              {
-                headers: {
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-              },
-            )
-
-            if (ttResponse.ok) {
-              const ttData = await ttResponse.json()
-              isAvailable = !ttData.userInfo || !ttData.userInfo.user || ttData.userInfo.user.id === ""
-            } else {
-              isAvailable = ttResponse.status === 404
-            }
-            break
-
-          case "youtube":
-            const ytResponse = await fetch(`https://corsproxy.io/?https://www.youtube.com/@${username}`, {
-              method: "HEAD",
-              headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              },
-            })
-
-            isAvailable = ytResponse.status === 404
-
-            if (!isAvailable) {
-              const ytChannelResponse = await fetch(`https://corsproxy.io/?https://www.youtube.com/c/${username}`, {
-                method: "HEAD",
-                headers: {
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-              })
-              isAvailable = ytChannelResponse.status === 404
-            }
-            break
-        }
-      } catch (error) {
-        console.error(`Error checking ${platform}:`, error)
-        isAvailable = false
+      if (platform === "roblox") {
+        results[platform] = await this.checkRobloxOnly(username)
+      } else {
+        results[platform] = false
       }
-
-      results[platform] = isAvailable
-      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
 
     return results
@@ -347,8 +309,14 @@ class UsernameSniper {
       return
     }
 
-    const username = this.generateRandomUsername(length)
-    this.elements.currentUsername.textContent = `${username} (checking via CORS proxy...)`
+    let username
+    do {
+      username = this.generateSmartUsername(length)
+    } while (this.checkedUsernames.has(username))
+
+    this.checkedUsernames.add(username)
+
+    this.elements.currentUsername.textContent = `${username} (checking...)`
     this.elements.currentUsername.style.color = "#f39c12"
 
     this.generatedCount++
@@ -403,7 +371,7 @@ class UsernameSniper {
       this.generateAndCheck()
     }, speed)
 
-    this.showNotification("Username checking started with CORS proxy!")
+    this.showNotification("Username checking started! (Roblox only - others need server)")
   }
 
   stopSniping() {
@@ -436,6 +404,7 @@ class UsernameSniper {
     this.generatedCount = 0
     this.availableCount = 0
     this.startTime = null
+    this.checkedUsernames.clear()
     this.updateStats()
     this.showNotification("Results cleared!")
   }
