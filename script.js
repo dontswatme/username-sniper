@@ -94,18 +94,40 @@ class UsernameSniper {
   }
 
   async checkUsernameAvailability(username, platforms) {
-    // Simulate API calls with random availability
-    // In a real implementation, you'd make actual API calls here
+    // Simulate API calls with much more realistic availability
+    // Most usernames should be taken, especially shorter ones
     const results = {}
 
     for (const platform of platforms) {
       // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, Math.random() * 100))
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 100))
 
-      // Random availability (adjust probability as needed)
-      // Shorter usernames are generally less likely to be available
-      const baseChance = username.length <= 4 ? 0.05 : username.length <= 6 ? 0.15 : 0.25
-      results[platform] = Math.random() < baseChance
+      // Much more realistic availability chances
+      let availabilityChance
+      if (username.length <= 3) {
+        availabilityChance = 0.001 // 0.1% chance for 3 chars
+      } else if (username.length <= 4) {
+        availabilityChance = 0.005 // 0.5% chance for 4 chars
+      } else if (username.length <= 5) {
+        availabilityChance = 0.02 // 2% chance for 5 chars
+      } else if (username.length <= 6) {
+        availabilityChance = 0.05 // 5% chance for 6 chars
+      } else if (username.length <= 8) {
+        availabilityChance = 0.1 // 10% chance for 7-8 chars
+      } else {
+        availabilityChance = 0.15 // 15% chance for 9+ chars
+      }
+
+      // Different platforms have different availability rates
+      const platformMultipliers = {
+        roblox: 0.8, // Slightly easier
+        tiktok: 0.6, // Harder
+        instagram: 0.5, // Very hard
+        youtube: 0.7, // Moderately hard
+      }
+
+      const finalChance = availabilityChance * (platformMultipliers[platform] || 1)
+      results[platform] = Math.random() < finalChance
     }
 
     return results
@@ -204,7 +226,7 @@ class UsernameSniper {
     }
 
     const username = this.generateRandomUsername(length)
-    this.elements.currentUsername.textContent = username
+    this.elements.currentUsername.textContent = `${username} (checking...)`
 
     this.generatedCount++
 
@@ -217,9 +239,16 @@ class UsernameSniper {
         this.addResult(username, availablePlatforms)
         this.sendToDiscord(username, availablePlatforms)
         this.showNotification(`Found available username: ${username}`)
+        this.elements.currentUsername.textContent = `${username} (AVAILABLE!)`
+        this.elements.currentUsername.style.color = "#2ecc71"
+      } else {
+        this.elements.currentUsername.textContent = `${username} (taken)`
+        this.elements.currentUsername.style.color = "#e74c3c"
       }
     } catch (error) {
       console.error("Error checking username:", error)
+      this.elements.currentUsername.textContent = `${username} (error)`
+      this.elements.currentUsername.style.color = "#f39c12"
     }
 
     this.updateStats()
