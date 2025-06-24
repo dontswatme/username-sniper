@@ -10,6 +10,9 @@ class UsernameSniper {
     this.initializeElements()
     this.bindEvents()
     this.updateStats()
+    this.showNotification(
+      "⚠️ This tool generates usernames for you to manually check. Real API checking requires a server.",
+    )
   }
 
   initializeElements() {
@@ -132,17 +135,65 @@ class UsernameSniper {
     }
   }
 
-  generateRandomUsername(length) {
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-    let result = ""
+  generateSmartUsername(length) {
+    const patterns = [
+      () => {
+        const prefixes = ["dark", "shadow", "fire", "ice", "neo", "cyber", "ghost", "storm", "void", "lunar"]
+        const suffixes = ["wolf", "blade", "storm", "fire", "shadow", "ghost", "void", "star", "moon", "sun"]
+        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
+        const suffix = suffixes[Math.floor(Math.random() * suffixes.length)]
+        return prefix + suffix
+      },
+      () => {
+        const words = ["epic", "pro", "legend", "master", "king", "lord", "ace", "elite", "prime", "ultra"]
+        const numbers = ["1", "2", "3", "7", "9", "69", "420", "777", "999", "2024"]
+        const word = words[Math.floor(Math.random() * words.length)]
+        const num = numbers[Math.floor(Math.random() * numbers.length)]
+        return word + num
+      },
+      () => {
+        const adjectives = ["cool", "hot", "fast", "slow", "big", "small", "red", "blue", "green", "black"]
+        const nouns = ["cat", "dog", "bird", "fish", "lion", "tiger", "bear", "wolf", "fox", "eagle"]
+        const numbers = ["1", "2", "3", "7", "9", "10", "99", "100"]
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+        const noun = nouns[Math.floor(Math.random() * nouns.length)]
+        const num = numbers[Math.floor(Math.random() * numbers.length)]
+        return adj + noun + num
+      },
+      () => {
+        const chars = "abcdefghijklmnopqrstuvwxyz"
+        const nums = "0123456789"
+        let result = chars[Math.floor(Math.random() * chars.length)]
 
-    result += "abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random() * 26)]
+        for (let i = 1; i < length - 1; i++) {
+          if (Math.random() < 0.7) {
+            result += chars[Math.floor(Math.random() * chars.length)]
+          } else {
+            result += nums[Math.floor(Math.random() * nums.length)]
+          }
+        }
 
-    for (let i = 1; i < length; i++) {
-      result += chars[Math.floor(Math.random() * chars.length)]
+        if (Math.random() < 0.5) {
+          result += nums[Math.floor(Math.random() * nums.length)]
+        } else {
+          result += chars[Math.floor(Math.random() * chars.length)]
+        }
+
+        return result
+      },
+    ]
+
+    let username = patterns[Math.floor(Math.random() * patterns.length)]()
+
+    if (username.length > length) {
+      username = username.substring(0, length)
     }
 
-    return result
+    while (username.length < length) {
+      username += Math.floor(Math.random() * 10).toString()
+    }
+
+    return username.toLowerCase()
   }
 
   getSelectedPlatforms() {
@@ -150,88 +201,41 @@ class UsernameSniper {
     return platforms.filter((platform) => document.getElementById(platform).checked)
   }
 
-  async checkRobloxOnly(username) {
-    try {
-      const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          usernames: [username],
-          excludeBannedUsers: true,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        return !data.data || data.data.length === 0
-      }
-      return false
-    } catch (error) {
-      return false
-    }
-  }
-
-  generateSmartUsername(length) {
-    const prefixes = ["pro", "epic", "cool", "fire", "dark", "ice", "neo", "max", "ace", "zen"]
-    const suffixes = ["gamer", "pro", "x", "yt", "tv", "god", "king", "lord", "boss", "elite"]
-    const numbers = ["1", "2", "3", "7", "9", "69", "420", "777", "999"]
-
-    const patterns = [
-      () => {
-        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
-        const num = numbers[Math.floor(Math.random() * numbers.length)]
-        return prefix + num
-      },
-      () => {
-        const word = prefixes[Math.floor(Math.random() * prefixes.length)]
-        const suffix = suffixes[Math.floor(Math.random() * suffixes.length)]
-        return word + suffix
-      },
-      () => {
-        const chars = "abcdefghijklmnopqrstuvwxyz"
-        let result = chars[Math.floor(Math.random() * chars.length)]
-        for (let i = 1; i < length; i++) {
-          result += "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]
-        }
-        return result
-      },
-    ]
-
-    return patterns[Math.floor(Math.random() * patterns.length)]()
-  }
-
-  async checkUsernameAvailability(username, platforms) {
-    const results = {}
-
-    for (const platform of platforms) {
-      if (platform === "roblox") {
-        results[platform] = await this.checkRobloxOnly(username)
-      } else {
-        results[platform] = false
-      }
+  createCheckLinks(username, platforms) {
+    const links = {
+      roblox: `https://www.roblox.com/users/profile?username=${username}`,
+      instagram: `https://www.instagram.com/${username}/`,
+      tiktok: `https://www.tiktok.com/@${username}`,
+      youtube: `https://www.youtube.com/@${username}`,
     }
 
-    return results
+    return platforms.map((platform) => ({
+      platform,
+      url: links[platform],
+    }))
   }
 
   async sendToDiscord(username, platforms) {
     const webhookUrl = this.elements.webhookInput.value.trim()
     if (!webhookUrl) return
 
+    const checkLinks = this.createCheckLinks(username, platforms)
+    const linkText = checkLinks.map((link) => `[${link.platform}](${link.url})`).join(" | ")
+
     const embed = {
-      title: "🎯 Available Username Found!",
-      description: `**${username}** is available on the following platforms:`,
-      color: 0x2ecc71,
-      fields: platforms.map((platform) => ({
-        name: platform.charAt(0).toUpperCase() + platform.slice(1),
-        value: "✅ Available",
-        inline: true,
-      })),
+      title: "🎯 Username Generated!",
+      description: `**${username}** - Click links to check availability:`,
+      color: 0xff4757,
+      fields: [
+        {
+          name: "Check Links",
+          value: linkText,
+          inline: false,
+        },
+      ],
       timestamp: new Date().toISOString(),
       footer: {
-        text: "Bomb Studios Username Checker",
+        text: "Bomb Studios Username Generator",
       },
     }
 
@@ -246,7 +250,7 @@ class UsernameSniper {
         }),
       })
 
-      this.showNotification(`Sent ${username} to Discord!`)
+      this.showNotification(`Sent ${username} to Discord with check links!`)
     } catch (error) {
       console.error("Failed to send to Discord:", error)
     }
@@ -263,16 +267,17 @@ class UsernameSniper {
 
     setTimeout(() => {
       notification.remove()
-    }, 4000)
+    }, 5000)
   }
 
-  addResult(username, availablePlatforms) {
+  addResult(username, platforms) {
     if (this.elements.resultsList.querySelector(".no-results")) {
       this.elements.resultsList.innerHTML = ""
     }
 
     const resultItem = document.createElement("div")
     resultItem.className = "result-item"
+    resultItem.style.cursor = "pointer"
 
     const usernameEl = document.createElement("div")
     usernameEl.className = "result-username"
@@ -281,20 +286,41 @@ class UsernameSniper {
     const platformsEl = document.createElement("div")
     platformsEl.className = "result-platforms"
 
-    availablePlatforms.forEach((platform) => {
-      const badge = document.createElement("span")
+    const checkLinks = this.createCheckLinks(username, platforms)
+
+    checkLinks.forEach(({ platform, url }) => {
+      const badge = document.createElement("a")
       badge.className = `platform-badge ${platform}`
       badge.textContent = platform
+      badge.href = url
+      badge.target = "_blank"
+      badge.style.textDecoration = "none"
+      badge.style.marginRight = "5px"
+      badge.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this.playButtonSound()
+      })
       platformsEl.appendChild(badge)
     })
 
     resultItem.appendChild(usernameEl)
     resultItem.appendChild(platformsEl)
 
+    resultItem.addEventListener("click", () => {
+      navigator.clipboard
+        .writeText(username)
+        .then(() => {
+          this.showNotification(`Copied ${username} to clipboard!`)
+        })
+        .catch(() => {
+          this.showNotification(`${username} - copy manually`)
+        })
+    })
+
     this.elements.resultsList.insertBefore(resultItem, this.elements.resultsList.firstChild)
 
     const results = this.elements.resultsList.querySelectorAll(".result-item")
-    if (results.length > 50) {
+    if (results.length > 100) {
       results[results.length - 1].remove()
     }
   }
@@ -310,44 +336,29 @@ class UsernameSniper {
     }
 
     let username
+    let attempts = 0
     do {
       username = this.generateSmartUsername(length)
-    } while (this.checkedUsernames.has(username))
+      attempts++
+    } while (this.checkedUsernames.has(username) && attempts < 10)
 
     this.checkedUsernames.add(username)
 
-    this.elements.currentUsername.textContent = `${username} (checking...)`
-    this.elements.currentUsername.style.color = "#f39c12"
+    this.elements.currentUsername.textContent = `${username} (click links to check manually)`
+    this.elements.currentUsername.style.color = "#ff4757"
 
     this.generatedCount++
+    this.availableCount++
 
-    try {
-      const availability = await this.checkUsernameAvailability(username, platforms)
-      const availablePlatforms = Object.keys(availability).filter((platform) => availability[platform])
-
-      if (availablePlatforms.length > 0) {
-        this.availableCount++
-        this.addResult(username, availablePlatforms)
-        this.sendToDiscord(username, availablePlatforms)
-        this.showNotification(`🎉 AVAILABLE: ${username} on ${availablePlatforms.join(", ")}!`)
-        this.elements.currentUsername.textContent = `${username} (✅ AVAILABLE on ${availablePlatforms.join(", ")})`
-        this.elements.currentUsername.style.color = "#2ecc71"
-        this.elements.currentUsername.style.animation = "pulse 1s ease-in-out 3"
-      } else {
-        this.elements.currentUsername.textContent = `${username} (❌ taken on ${platforms.join(", ")})`
-        this.elements.currentUsername.style.color = "#e74c3c"
-      }
-    } catch (error) {
-      this.elements.currentUsername.textContent = `${username} (⚠️ error checking)`
-      this.elements.currentUsername.style.color = "#f39c12"
-    }
+    this.addResult(username, platforms)
+    this.sendToDiscord(username, platforms)
 
     this.updateStats()
   }
 
   updateStats() {
     this.elements.generatedCountEl.textContent = this.generatedCount.toLocaleString()
-    this.elements.availableCountEl.textContent = this.availableCount.toLocaleString()
+    this.elements.availableCountEl.textContent = this.generatedCount.toLocaleString()
 
     if (this.startTime) {
       const elapsed = (Date.now() - this.startTime) / 1000 / 60
@@ -371,7 +382,7 @@ class UsernameSniper {
       this.generateAndCheck()
     }, speed)
 
-    this.showNotification("Username checking started! (Roblox only - others need server)")
+    this.showNotification("Username generation started! Click usernames to copy, click badges to check!")
   }
 
   stopSniping() {
@@ -388,7 +399,7 @@ class UsernameSniper {
     this.elements.stopBtn.disabled = true
     this.elements.currentUsername.textContent = "Stopped"
 
-    this.showNotification("Username checking stopped!")
+    this.showNotification("Username generation stopped!")
   }
 
   restartGeneration() {
@@ -400,7 +411,7 @@ class UsernameSniper {
 
   clearResults() {
     this.elements.resultsList.innerHTML =
-      '<div class="no-results">No available usernames found yet. Start checking to find gems! 💎</div>'
+      '<div class="no-results">No usernames generated yet. Start generating to get ideas! 💎</div>'
     this.generatedCount = 0
     this.availableCount = 0
     this.startTime = null
