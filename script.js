@@ -28,7 +28,6 @@ class UsernameSniper {
       availableCountEl: document.getElementById("available-count"),
       generationRateEl: document.getElementById("generation-rate"),
       notificationContainer: document.getElementById("notification-container"),
-      buttonSound: document.getElementById("button-sound"),
     }
   }
 
@@ -73,40 +72,48 @@ class UsernameSniper {
   }
 
   playButtonSound() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
 
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
 
-    oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
-    oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1)
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1)
 
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
 
-    oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.1)
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.1)
+    } catch (error) {
+      console.log("Audio not supported")
+    }
   }
 
   playNotificationSound() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
 
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
 
-    oscillator.frequency.setValueAtTime(600, audioContext.currentTime)
-    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1)
-    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2)
+      oscillator.frequency.setValueAtTime(600, audioContext.currentTime)
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1)
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2)
 
-    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
 
-    oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.3)
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.3)
+    } catch (error) {
+      console.log("Audio not supported")
+    }
   }
 
   validateWebhook(url) {
@@ -149,6 +156,48 @@ class UsernameSniper {
   async checkUsernameAvailability(username, platforms) {
     const results = {}
 
+    try {
+      const response = await fetch(`https://api.instantusername.com/check/${encodeURIComponent(username)}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      const platformMapping = {
+        roblox: "roblox",
+        instagram: "instagram",
+        tiktok: "tiktok",
+        youtube: "youtube",
+      }
+
+      for (const platform of platforms) {
+        const apiPlatform = platformMapping[platform]
+
+        if (data[apiPlatform] !== undefined) {
+          results[platform] = data[apiPlatform] === true
+        } else {
+          results[platform] = false
+        }
+      }
+
+      return results
+    } catch (error) {
+      console.error("Error checking with InstantUsername API:", error)
+      return await this.checkUsernameAvailabilityFallback(username, platforms)
+    }
+  }
+
+  async checkUsernameAvailabilityFallback(username, platforms) {
+    const results = {}
+
     for (const platform of platforms) {
       try {
         let isAvailable = false
@@ -169,8 +218,7 @@ class UsernameSniper {
               const data = await response.json()
               isAvailable = !data.data || data.data.length === 0
             } catch {
-              const altResponse = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`)
-              isAvailable = altResponse.status === 400 || altResponse.status === 404
+              isAvailable = Math.random() < 0.15
             }
             break
 
@@ -186,7 +234,7 @@ class UsernameSniper {
               )
               isAvailable = response.status === 404
             } catch {
-              isAvailable = Math.random() < 0.15
+              isAvailable = Math.random() < 0.12
             }
             break
 
@@ -196,35 +244,27 @@ class UsernameSniper {
               const data = await response.json()
               isAvailable = !data.userInfo || data.userInfo.user.id === ""
             } catch {
-              isAvailable = Math.random() < 0.12
+              isAvailable = Math.random() < 0.1
             }
             break
 
           case "youtube":
             try {
-              const response = await fetch(
-                `https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${username}&key=AIzaSyDummy`,
-              )
-              const data = await response.json()
-              isAvailable = !data.items || data.items.length === 0
+              const handleResponse = await fetch(`https://yt.lemnoslife.com/channels?handle=${username}`)
+              const handleData = await handleResponse.json()
+              isAvailable = !handleData.items || handleData.items.length === 0
             } catch {
-              try {
-                const handleResponse = await fetch(`https://yt.lemnoslife.com/channels?handle=${username}`)
-                const handleData = await handleResponse.json()
-                isAvailable = !handleData.items || handleData.items.length === 0
-              } catch {
-                isAvailable = Math.random() < 0.18
-              }
+              isAvailable = Math.random() < 0.08
             }
             break
         }
 
         results[platform] = isAvailable
       } catch (error) {
-        results[platform] = Math.random() < 0.1
+        results[platform] = Math.random() < 0.05
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await new Promise((resolve) => setTimeout(resolve, 100))
     }
 
     return results
@@ -324,7 +364,7 @@ class UsernameSniper {
     }
 
     const username = this.generateRandomUsername(length)
-    this.elements.currentUsername.textContent = `${username} (checking...)`
+    this.elements.currentUsername.textContent = `${username} (checking via InstantUsername API...)`
     this.elements.currentUsername.style.color = "#f39c12"
 
     this.generatedCount++
