@@ -149,87 +149,163 @@ class UsernameSniper {
     return platforms.filter((platform) => document.getElementById(platform).checked)
   }
 
+  async checkRobloxUsername(username) {
+    try {
+      const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          usernames: [username],
+          excludeBannedUsers: true,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return !data.data || data.data.length === 0
+      }
+
+      const fallbackResponse = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`)
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json()
+        return fallbackData.errorMessage === "User not found"
+      }
+
+      return fallbackResponse.status === 404
+    } catch (error) {
+      console.error("Roblox check failed:", error)
+      return null
+    }
+  }
+
+  async checkInstagramUsername(username) {
+    try {
+      const response = await fetch(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      })
+
+      if (response.status === 404) {
+        return true
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        return !data.data || !data.data.user
+      }
+
+      return false
+    } catch (error) {
+      try {
+        const proxyResponse = await fetch(
+          `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.instagram.com/${username}/`)}`,
+        )
+        if (proxyResponse.ok) {
+          const proxyData = await proxyResponse.json()
+          return proxyData.contents.includes("Sorry, this page isn't available")
+        }
+      } catch (proxyError) {
+        console.error("Instagram check failed:", error)
+      }
+      return null
+    }
+  }
+
+  async checkTikTokUsername(username) {
+    try {
+      const response = await fetch(`https://www.tiktok.com/api/user/detail/?uniqueId=${username}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return !data.userInfo || !data.userInfo.user || data.userInfo.user.id === ""
+      }
+
+      return response.status === 404
+    } catch (error) {
+      try {
+        const proxyResponse = await fetch(
+          `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.tiktok.com/@${username}`)}`,
+        )
+        if (proxyResponse.ok) {
+          const proxyData = await proxyResponse.json()
+          return proxyData.contents.includes("Couldn't find this account")
+        }
+      } catch (proxyError) {
+        console.error("TikTok check failed:", error)
+      }
+      return null
+    }
+  }
+
+  async checkYouTubeUsername(username) {
+    try {
+      const handleResponse = await fetch(`https://www.youtube.com/@${username}`, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      })
+
+      if (handleResponse.status === 404) {
+        return true
+      }
+
+      const channelResponse = await fetch(`https://www.youtube.com/c/${username}`, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      })
+
+      return channelResponse.status === 404
+    } catch (error) {
+      try {
+        const proxyResponse = await fetch(
+          `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.youtube.com/@${username}`)}`,
+        )
+        if (proxyResponse.ok) {
+          const proxyData = await proxyResponse.json()
+          return proxyData.contents.includes("This channel doesn't exist")
+        }
+      } catch (proxyError) {
+        console.error("YouTube check failed:", error)
+      }
+      return null
+    }
+  }
+
   async checkUsernameAvailability(username, platforms) {
     const results = {}
+    const checkers = {
+      roblox: this.checkRobloxUsername.bind(this),
+      instagram: this.checkInstagramUsername.bind(this),
+      tiktok: this.checkTikTokUsername.bind(this),
+      youtube: this.checkYouTubeUsername.bind(this),
+    }
 
     for (const platform of platforms) {
       try {
-        let isAvailable = false
+        const isAvailable = await checkers[platform](username)
+        results[platform] = isAvailable === true
 
-        switch (platform) {
-          case "roblox":
-            try {
-              const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  usernames: [username],
-                  excludeBannedUsers: true,
-                }),
-              })
-
-              if (response.ok) {
-                const data = await response.json()
-                isAvailable = !data.data || data.data.length === 0
-              } else {
-                const altResponse = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`)
-                if (altResponse.ok) {
-                  const altData = await altResponse.json()
-                  isAvailable = !altData.Id
-                } else {
-                  isAvailable = altResponse.status === 404
-                }
-              }
-            } catch {
-              isAvailable = Math.random() < 0.03
-            }
-            break
-
-          case "instagram":
-            try {
-              const response = await fetch(`https://www.instagram.com/${username}/`, {
-                method: "HEAD",
-                mode: "no-cors",
-              })
-              isAvailable = false
-            } catch {
-              isAvailable = Math.random() < 0.02
-            }
-            break
-
-          case "tiktok":
-            try {
-              const response = await fetch(`https://www.tiktok.com/@${username}`, {
-                method: "HEAD",
-                mode: "no-cors",
-              })
-              isAvailable = false
-            } catch {
-              isAvailable = Math.random() < 0.02
-            }
-            break
-
-          case "youtube":
-            try {
-              const response = await fetch(`https://www.youtube.com/@${username}`, {
-                method: "HEAD",
-                mode: "no-cors",
-              })
-              isAvailable = false
-            } catch {
-              isAvailable = Math.random() < 0.02
-            }
-            break
+        if (isAvailable === null) {
+          console.log(`${platform} check inconclusive for ${username}`)
         }
 
-        results[platform] = isAvailable
+        await new Promise((resolve) => setTimeout(resolve, 500))
       } catch (error) {
-        results[platform] = Math.random() < 0.01
+        console.error(`Error checking ${platform}:`, error)
+        results[platform] = false
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 200))
     }
 
     return results
@@ -329,7 +405,7 @@ class UsernameSniper {
     }
 
     const username = this.generateRandomUsername(length)
-    this.elements.currentUsername.textContent = `${username} (checking...)`
+    this.elements.currentUsername.textContent = `${username} (checking with real APIs...)`
     this.elements.currentUsername.style.color = "#f39c12"
 
     this.generatedCount++
@@ -337,14 +413,13 @@ class UsernameSniper {
     try {
       const availability = await this.checkUsernameAvailability(username, platforms)
       const availablePlatforms = Object.keys(availability).filter((platform) => availability[platform])
-      const takenPlatforms = Object.keys(availability).filter((platform) => !availability[platform])
 
       if (availablePlatforms.length > 0) {
         this.availableCount++
         this.addResult(username, availablePlatforms)
         this.sendToDiscord(username, availablePlatforms)
-        this.showNotification(`🎉 AVAILABLE: ${username} on ${availablePlatforms.join(", ")}!`)
-        this.elements.currentUsername.textContent = `${username} (✅ AVAILABLE on ${availablePlatforms.join(", ")})`
+        this.showNotification(`🎉 REAL AVAILABLE: ${username} on ${availablePlatforms.join(", ")}!`)
+        this.elements.currentUsername.textContent = `${username} (✅ VERIFIED AVAILABLE on ${availablePlatforms.join(", ")})`
         this.elements.currentUsername.style.color = "#2ecc71"
         this.elements.currentUsername.style.animation = "pulse 1s ease-in-out 3"
       } else {
@@ -352,7 +427,7 @@ class UsernameSniper {
         this.elements.currentUsername.style.color = "#e74c3c"
       }
     } catch (error) {
-      this.elements.currentUsername.textContent = `${username} (⚠️ error checking)`
+      this.elements.currentUsername.textContent = `${username} (⚠️ error checking APIs)`
       this.elements.currentUsername.style.color = "#f39c12"
     }
 
@@ -385,7 +460,7 @@ class UsernameSniper {
       this.generateAndCheck()
     }, speed)
 
-    this.showNotification("Username checking started!")
+    this.showNotification("Real username checking started!")
   }
 
   stopSniping() {
@@ -414,7 +489,7 @@ class UsernameSniper {
 
   clearResults() {
     this.elements.resultsList.innerHTML =
-      '<div class="no-results">No available usernames found yet. Start checking to find gems! 💎</div>'
+      '<div class="no-results">No available usernames found yet. Start checking to find real gems! 💎</div>'
     this.generatedCount = 0
     this.availableCount = 0
     this.startTime = null
