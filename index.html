@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bomb Studios - Username Sniper</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-bomb"></i>
+                <h1>Bomb Studios</h1>
+            </div>
+            <p class="subtitle">Ultimate Username Sniper</p>
+        </header>
+
+        <main class="main-content">
+            <div class="control-panel">
+                <div class="settings-grid">
+                    <div class="setting-group">
+                        <label for="username-length">Username Length</label>
+                        <input type="range" id="username-length" min="3" max="12" value="6">
+                        <span class="length-display">6</span>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="generation-speed">Speed (ms)</label>
+                        <input type="range" id="generation-speed" min="100" max="2000" value="500">
+                        <span class="speed-display">500ms</span>
+                    </div>
+                </div>
+
+                <div class="platform-selector">
+                    <h3>Select Platforms</h3>
+                    <div class="platform-grid">
+                        <label class="platform-checkbox">
+                            <input type="checkbox" id="roblox" checked>
+                            <span class="checkmark roblox"></span>
+                            <i class="fas fa-gamepad"></i>
+                            Roblox
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" id="tiktok" checked>
+                            <span class="checkmark tiktok"></span>
+                            <i class="fab fa-tiktok"></i>
+                            TikTok
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" id="instagram" checked>
+                            <span class="checkmark instagram"></span>
+                            <i class="fab fa-instagram"></i>
+                            Instagram
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" id="youtube" checked>
+                            <span class="checkmark youtube"></span>
+                            <i class="fab fa-youtube"></i>
+                            YouTube
+                        </label>
+                    </div>
+                </div>
+
+                <div class="webhook-section">
+                    <h3>Discord Webhook (Optional)</h3>
+                    <input type="url" id="webhook-url" placeholder="https://discord.com/api/webhooks/..." class="webhook-input">
+                    <div class="webhook-status" id="webhook-status"></div>
+                </div>
+
+                <div class="control-buttons">
+                    <button id="start-btn" class="btn btn-primary">
+                        <i class="fas fa-play"></i>
+                        Start Sniping
+                    </button>
+                    <button id="stop-btn" class="btn btn-secondary" disabled>
+                        <i class="fas fa-stop"></i>
+                        Stop
+                    </button>
+                </div>
+            </div>
+
+            <div class="results-panel">
+                <div class="stats-bar">
+                    <div class="stat">
+                        <span class="stat-label">Generated</span>
+                        <span class="stat-value" id="generated-count">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Available</span>
+                        <span class="stat-value available" id="available-count">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Rate</span>
+                        <span class="stat-value" id="generation-rate">0/min</span>
+                    </div>
+                </div>
+
+                <div class="current-username">
+                    <h3>Current Check</h3>
+                    <div class="username-display" id="current-username">Ready to start...</div>
+                </div>
+
+                <div class="results-container">
+                    <div class="results-header">
+                        <h3>Results</h3>
+                        <button id="clear-results" class="btn btn-small">
+                            <i class="fas fa-trash"></i>
+                            Clear
+                        </button>
+                    </div>
+                    <div class="results-list" id="results-list">
+                        <div class="no-results">No results yet. Start sniping to see available usernames!</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="notification-container" id="notification-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
