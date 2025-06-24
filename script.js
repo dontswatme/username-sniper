@@ -94,43 +94,142 @@ class UsernameSniper {
   }
 
   async checkUsernameAvailability(username, platforms) {
-    // Simulate API calls with much more realistic availability
-    // Most usernames should be taken, especially shorter ones
     const results = {}
 
     for (const platform of platforms) {
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 100))
+      try {
+        let isAvailable = false
 
-      // Much more realistic availability chances
-      let availabilityChance
-      if (username.length <= 3) {
-        availabilityChance = 0.001 // 0.1% chance for 3 chars
-      } else if (username.length <= 4) {
-        availabilityChance = 0.005 // 0.5% chance for 4 chars
-      } else if (username.length <= 5) {
-        availabilityChance = 0.02 // 2% chance for 5 chars
-      } else if (username.length <= 6) {
-        availabilityChance = 0.05 // 5% chance for 6 chars
-      } else if (username.length <= 8) {
-        availabilityChance = 0.1 // 10% chance for 7-8 chars
-      } else {
-        availabilityChance = 0.15 // 15% chance for 9+ chars
+        switch (platform) {
+          case "roblox":
+            isAvailable = await this.checkRoblox(username)
+            break
+          case "instagram":
+            isAvailable = await this.checkInstagram(username)
+            break
+          case "tiktok":
+            isAvailable = await this.checkTikTok(username)
+            break
+          case "youtube":
+            isAvailable = await this.checkYouTube(username)
+            break
+        }
+
+        results[platform] = isAvailable
+      } catch (error) {
+        console.error(`Error checking ${platform}:`, error)
+        results[platform] = false // Assume taken if error
       }
 
-      // Different platforms have different availability rates
-      const platformMultipliers = {
-        roblox: 0.8, // Slightly easier
-        tiktok: 0.6, // Harder
-        instagram: 0.5, // Very hard
-        youtube: 0.7, // Moderately hard
-      }
-
-      const finalChance = availabilityChance * (platformMultipliers[platform] || 1)
-      results[platform] = Math.random() < finalChance
+      // Small delay between platform checks to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 200))
     }
 
     return results
+  }
+
+  async checkRoblox(username) {
+    try {
+      // Try to access Roblox user profile
+      const response = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      })
+
+      if (response.status === 200) {
+        const data = await response.json()
+        return !data.Id // Available if no ID returned
+      }
+
+      // If 404 or other error, likely available
+      return response.status === 404
+    } catch (error) {
+      // CORS or network error - try alternative method
+      return await this.checkRobloxAlternative(username)
+    }
+  }
+
+  async checkRobloxAlternative(username) {
+    try {
+      // Alternative: check if profile page exists
+      const response = await fetch(`https://www.roblox.com/users/profile?username=${username}`, {
+        method: "HEAD",
+        mode: "no-cors",
+      })
+      return false // If we can fetch it, user exists
+    } catch (error) {
+      return true // If error, might be available
+    }
+  }
+
+  async checkInstagram(username) {
+    try {
+      // Check Instagram profile existence
+      const response = await fetch(`https://www.instagram.com/${username}/`, {
+        method: "HEAD",
+        mode: "no-cors",
+      })
+      return false // If successful, user exists
+    } catch (error) {
+      // Try alternative method with JSON endpoint
+      try {
+        const jsonResponse = await fetch(
+          `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
+          {
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+            },
+          },
+        )
+        return jsonResponse.status === 404
+      } catch (e) {
+        return true // Assume available if can't check
+      }
+    }
+  }
+
+  async checkTikTok(username) {
+    try {
+      // Check TikTok profile
+      const response = await fetch(`https://www.tiktok.com/@${username}`, {
+        method: "HEAD",
+        mode: "no-cors",
+      })
+      return false // If successful, user exists
+    } catch (error) {
+      // Try API endpoint
+      try {
+        const apiResponse = await fetch(`https://www.tiktok.com/api/user/detail/?uniqueId=${username}`)
+        const data = await apiResponse.json()
+        return !data.userInfo || !data.userInfo.user
+      } catch (e) {
+        return true // Assume available if can't check
+      }
+    }
+  }
+
+  async checkYouTube(username) {
+    try {
+      // Check YouTube channel by handle
+      const response = await fetch(`https://www.youtube.com/@${username}`, {
+        method: "HEAD",
+        mode: "no-cors",
+      })
+      return false // If successful, channel exists
+    } catch (error) {
+      // Try alternative with channel URL
+      try {
+        const altResponse = await fetch(`https://www.youtube.com/c/${username}`, {
+          method: "HEAD",
+          mode: "no-cors",
+        })
+        return false // If successful, channel exists
+      } catch (e) {
+        return true // Assume available if can't check
+      }
+    }
   }
 
   async sendToDiscord(username, platforms) {
@@ -227,27 +326,29 @@ class UsernameSniper {
 
     const username = this.generateRandomUsername(length)
     this.elements.currentUsername.textContent = `${username} (checking...)`
+    this.elements.currentUsername.style.color = "#f39c12"
 
     this.generatedCount++
 
     try {
       const availability = await this.checkUsernameAvailability(username, platforms)
       const availablePlatforms = Object.keys(availability).filter((platform) => availability[platform])
+      const takenPlatforms = Object.keys(availability).filter((platform) => !availability[platform])
 
       if (availablePlatforms.length > 0) {
         this.availableCount++
         this.addResult(username, availablePlatforms)
         this.sendToDiscord(username, availablePlatforms)
-        this.showNotification(`Found available username: ${username}`)
-        this.elements.currentUsername.textContent = `${username} (AVAILABLE!)`
+        this.showNotification(`🎉 Found available username: ${username} on ${availablePlatforms.join(", ")}`)
+        this.elements.currentUsername.textContent = `${username} (AVAILABLE on ${availablePlatforms.length}/${platforms.length} platforms!)`
         this.elements.currentUsername.style.color = "#2ecc71"
       } else {
-        this.elements.currentUsername.textContent = `${username} (taken)`
+        this.elements.currentUsername.textContent = `${username} (taken on all platforms)`
         this.elements.currentUsername.style.color = "#e74c3c"
       }
     } catch (error) {
       console.error("Error checking username:", error)
-      this.elements.currentUsername.textContent = `${username} (error)`
+      this.elements.currentUsername.textContent = `${username} (error checking)`
       this.elements.currentUsername.style.color = "#f39c12"
     }
 
